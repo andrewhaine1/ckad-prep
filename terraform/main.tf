@@ -131,8 +131,8 @@ resource "azurerm_virtual_machine" "kube_cluster_node" {
 
   os_profile {
     computer_name  = "${var.prefix}-vm-${count.index + 1}"
-    admin_username = "kube-admin-a5e5fa54"
-    admin_password = "a5e5fa54%dfdd&4d93#b3b9!0c1633e7b797"
+    admin_username = ""
+    admin_password = ""
   }
 
   os_profile_linux_config {
