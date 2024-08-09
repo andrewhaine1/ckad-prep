@@ -176,8 +176,8 @@ resource "azurerm_virtual_machine" "kube_cluster_node" {
 
   os_profile {
     computer_name  = "${var.prefix}-vm-${count.index + 1}"
-    admin_username = "kube-admin-a5e5fa54"
-    admin_password = "a5e5fa54%dfdd&4d93#b3b9!0c1633e7b797"
+    admin_username = var.kube_cluster_node_admin_username
+    admin_password = var.kube_cluster_node_admin_password
   }
 
   os_profile_linux_config {
@@ -392,8 +392,8 @@ resource "azurerm_virtual_machine" "kube_cluster_admin_vm" {
 
   os_profile {
     computer_name  = "${var.prefix}-admin-vm-1-osdisk1"
-    admin_username = "kube-admin-8af596bde667"
-    admin_password = "9ac5922A@1880#4Df6%9f4e!8c1c3c9E5cea"
+    admin_username = var.kube_cluster_admin_vm_admin_username
+    admin_password = var.kube_cluster_admin_vm_admin_password
   }
 
   os_profile_linux_config {
