@@ -81,6 +81,51 @@ resource "azurerm_dns_cname_record" "kube_cluster_public_dns_zone_argocd_cname_r
   record              = azurerm_dns_zone.kube_cluster_public_dns_zone.name
 }
 
+resource "azurerm_dns_cname_record" "kube_cluster_public_dns_zone_eshop_cname_record" {
+  name                = "eshop"
+  zone_name           = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  ttl                 = 300
+  record              = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+}
+
+resource "azurerm_dns_cname_record" "kube_cluster_public_dns_zone_eshop_apigwws_cname_record" {
+  name                = "apigwws"
+  zone_name           = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  ttl                 = 300
+  record              = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+}
+
+resource "azurerm_dns_cname_record" "kube_cluster_public_dns_zone_eshop_identity_cname_record" {
+  name                = "eshop-identity"
+  zone_name           = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  ttl                 = 300
+  record              = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+}
+
+resource "azurerm_dns_cname_record" "kube_cluster_public_dns_zone_rancher_cname_record" {
+  name                = "rancher"
+  zone_name           = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  ttl                 = 300
+  record              = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+}
+
+resource "azurerm_dns_cname_record" "kube_cluster_public_dns_zone_dash_cname_record" {
+  name                = "dashboard"
+  zone_name           = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  ttl                 = 300
+  record              = azurerm_dns_zone.kube_cluster_public_dns_zone.name
+}
+
+resource "azurerm_private_dns_zone" "kube_cluster_private_dns_zone" {
+  name                = "privatelink.azurecr.io"
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+}
+
 output "kube_cluster_public_dns_zone" {
   value = azurerm_dns_zone.kube_cluster_public_dns_zone.name_servers
 }
@@ -160,23 +205,27 @@ resource "azurerm_route_table" "kube_cluster_node_route_table" {
 
   route {
     name                   = "kube-cluster-vm-1"
-    address_prefix         = "192.168.154.64/26"
+    address_prefix         = "10.1.154.64/26"
     next_hop_type          = "VirtualAppliance"
     next_hop_in_ip_address = azurerm_network_interface.kube_cluster_node_vm_nic[0].private_ip_address
   }
 
   route {
     name                   = "kube-cluster-vm-2"
-    address_prefix         = "192.168.241.0/26"
+    address_prefix         = "10.1.241.0/26"
     next_hop_type          = "VirtualAppliance"
     next_hop_in_ip_address = azurerm_network_interface.kube_cluster_node_vm_nic[1].private_ip_address
   }
 
   route {
     name                   = "kube-cluster-vm-3"
-    address_prefix         = "192.168.247.128/26"
+    address_prefix         = "10.1.247.128/26"
     next_hop_type          = "VirtualAppliance"
     next_hop_in_ip_address = azurerm_network_interface.kube_cluster_node_vm_nic[2].private_ip_address
+  }
+
+  lifecycle {
+    ignore_changes = []
   }
 
   tags = {
@@ -300,6 +349,75 @@ resource "azurerm_network_interface_security_group_association" "kube_cluster_ht
   network_interface_id      = azurerm_network_interface.kube_cluster_node_vm_nic[2].id
 }
 
+# --------------------------------------- Admin VM ------------------------------------------- #
+resource "azurerm_network_interface" "kube_cluster_admin_vm_nic" {
+  name                  = "${var.prefix}-admin-vm-nic-1"
+  location              = azurerm_resource_group.kube_cluster_rg.location
+  resource_group_name   = azurerm_resource_group.kube_cluster_rg.name
+  ip_forwarding_enabled = true
+
+  ip_configuration {
+    name                          = "${var.prefix}-admin-vm-configuration"
+    subnet_id                     = azurerm_subnet.kube_cluster_subnet.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+resource "azurerm_virtual_machine" "kube_cluster_admin_vm" {
+  name                  = "${var.prefix}-admin-vm-1"
+  location              = azurerm_resource_group.kube_cluster_rg.location
+  resource_group_name   = azurerm_resource_group.kube_cluster_rg.name
+  network_interface_ids = [azurerm_network_interface.kube_cluster_admin_vm_nic.id]
+  vm_size               = "Standard_B2s"
+
+  # Uncomment this line to delete the OS disk automatically when deleting the VM
+  delete_os_disk_on_termination = true
+
+  # Uncomment this line to delete the data disks automatically when deleting the VM
+  delete_data_disks_on_termination = true
+
+  storage_image_reference {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts"
+    version   = "latest"
+  }
+
+  storage_os_disk {
+    name              = "${var.prefix}-admin-vm-1-osdisk1"
+    caching           = "ReadWrite"
+    create_option     = "FromImage"
+    managed_disk_type = "Standard_LRS"
+  }
+
+  os_profile {
+    computer_name  = "${var.prefix}-admin-vm-1-osdisk1"
+    admin_username = "kube-admin-8af596bde667"
+    admin_password = "9ac5922A@1880#4Df6%9f4e!8c1c3c9E5cea"
+  }
+
+  os_profile_linux_config {
+    disable_password_authentication = false
+  }
+
+  connection {
+    host    = "${var.prefix}-admin-vm-1.sanorth.cloudapp.azure.com"
+    user    = "kubeadmin"
+    type    = "ssh"
+    timeout = "1m"
+    agent   = true
+  }
+
+  tags = {
+    environment = "staging"
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "kube_cluster_admin_vm_ssh_network_security_group_association" {
+  network_security_group_id = azurerm_network_security_group.kube_cluster_ssh_network_security_group.id
+  network_interface_id      = azurerm_network_interface.kube_cluster_admin_vm_nic.id
+}
+
 # -------------------------- Load balancer ------------------------------------------- #
 resource "azurerm_public_ip" "kube_cluster_public_ip" {
   name                = "${var.prefix}-load-balancer-public-ip"
@@ -332,6 +450,11 @@ resource "azurerm_lb_backend_address_pool" "kube_cluster_lb_ssh_backend_address_
   name            = "${var.prefix}-ssh-backend-address-pool"
 }
 
+resource "azurerm_lb_backend_address_pool" "kube_cluster_lb_admin_ssh_backend_address_pool" {
+  loadbalancer_id = azurerm_lb.kube_cluster_lb.id
+  name            = "${var.prefix}-admin-ssh-backend-address-pool"
+}
+
 resource "azurerm_lb_backend_address_pool" "kube_cluster_lb_http_backend_address_pool" {
   loadbalancer_id = azurerm_lb.kube_cluster_lb.id
   name            = "${var.prefix}-http-backend-address-pool"
@@ -342,6 +465,13 @@ resource "azurerm_lb_backend_address_pool_address" "kube_cluster_lb_ssh_backend_
   backend_address_pool_id = azurerm_lb_backend_address_pool.kube_cluster_lb_ssh_backend_address_pool.id
   virtual_network_id      = azurerm_virtual_network.kube_cluster_network.id
   ip_address              = azurerm_network_interface.kube_cluster_node_vm_nic[0].private_ip_address
+}
+
+resource "azurerm_lb_backend_address_pool_address" "kube_cluster_lb_admin_ssh_backend_address_pool_address" {
+  name                    = "${var.prefix}-admin-vm-1"
+  backend_address_pool_id = azurerm_lb_backend_address_pool.kube_cluster_lb_admin_ssh_backend_address_pool.id
+  virtual_network_id      = azurerm_virtual_network.kube_cluster_network.id
+  ip_address              = azurerm_network_interface.kube_cluster_admin_vm_nic.private_ip_address
 }
 
 resource "azurerm_lb_backend_address_pool_address" "kube_cluster_lb_http_backend_address_pool_address" {
@@ -362,6 +492,18 @@ resource "azurerm_lb_nat_rule" "kube_cluster_nat_rule" {
   backend_port                   = 22
   frontend_ip_configuration_name = "PublicIPAddress"
   backend_address_pool_id        = azurerm_lb_backend_address_pool.kube_cluster_lb_ssh_backend_address_pool.id
+}
+
+resource "azurerm_lb_nat_rule" "kube_cluster_admin_ssh_nat_rule" {
+  resource_group_name            = azurerm_resource_group.kube_cluster_rg.name
+  loadbalancer_id                = azurerm_lb.kube_cluster_lb.id
+  name                           = "AdminSSHAccess"
+  protocol                       = "Tcp"
+  frontend_port_start            = 223
+  frontend_port_end              = 223
+  backend_port                   = 22
+  frontend_ip_configuration_name = "PublicIPAddress"
+  backend_address_pool_id        = azurerm_lb_backend_address_pool.kube_cluster_lb_admin_ssh_backend_address_pool.id
 }
 
 resource "azurerm_lb_nat_rule" "kube_cluster_api_nat_rule" {
@@ -404,3 +546,107 @@ resource "azurerm_lb_rule" "https_rule" {
   probe_id                       = azurerm_lb_probe.kube_cluster_lb_http_health_probe.id
 }
 
+# -------------------------- VM Start Stop ------------------------------------------- #
+resource "azurerm_automation_account" "kube_cluster_automation_account" {
+  name                = "${var.prefix}-automation-account"
+  location            = azurerm_resource_group.kube_cluster_rg.location
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  sku_name            = "Basic"
+
+  tags = {
+    environment = "staging"
+  }
+}
+
+resource "azurerm_storage_account" "kube_cluster_start_stop_function_storage_account" {
+  name                     = "ssfunctionsa"
+  resource_group_name      = azurerm_resource_group.kube_cluster_rg.name
+  location                 = azurerm_resource_group.kube_cluster_rg.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_service_plan" "kube_cluster_start_stop_function_sp" {
+  name                = "${var.prefix}-ss-app-service-plan"
+  location            = azurerm_resource_group.kube_cluster_rg.location
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  os_type             = "Linux"
+  sku_name            = "B1"
+}
+
+resource "azurerm_linux_function_app" "kube_cluster_start_stop_function_app" {
+  name                       = "${var.prefix}-ss-function"
+  location                   = azurerm_resource_group.kube_cluster_rg.location
+  resource_group_name        = azurerm_resource_group.kube_cluster_rg.name
+  service_plan_id            = azurerm_service_plan.kube_cluster_start_stop_function_sp.id
+  storage_account_name       = azurerm_storage_account.kube_cluster_start_stop_function_storage_account.name
+  storage_account_access_key = azurerm_storage_account.kube_cluster_start_stop_function_storage_account.primary_access_key
+
+  site_config {}
+}
+
+resource "azurerm_log_analytics_workspace" "kube_cluster_start_stop_law" {
+  name                = "${var.prefix}-ss-law"
+  location            = azurerm_resource_group.kube_cluster_rg.location
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+resource "azurerm_application_insights" "kube_cluster_start_stop_ai" {
+  name                = "${var.prefix}-ss-app-insights"
+  location            = azurerm_resource_group.kube_cluster_rg.location
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  workspace_id        = azurerm_log_analytics_workspace.kube_cluster_start_stop_law.id
+  application_type    = "other"
+}
+
+# -------------------------- Container registry ------------------------------------------- #
+resource "azurerm_container_registry" "kube_cluster_acr" {
+  name                = "kubeclusteracr"
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  location            = azurerm_resource_group.kube_cluster_rg.location
+  sku                 = "Premium"
+  admin_enabled       = true
+
+  public_network_access_enabled = false
+}
+
+# Create azure private endpoint
+resource "azurerm_private_endpoint" "kube_cluster_acr_private_endpoint" {
+  name                = "${var.prefix}-acr-private-endpoint"
+  resource_group_name = azurerm_resource_group.kube_cluster_rg.name
+  location            = azurerm_resource_group.kube_cluster_rg.location
+  subnet_id           = azurerm_subnet.kube_cluster_subnet.id
+
+  private_service_connection {
+    name                           = "${var.prefix}-acr-service-connection"
+    private_connection_resource_id = azurerm_container_registry.kube_cluster_acr.id
+    is_manual_connection           = false
+    subresource_names = [
+      "registry"
+    ]
+  }
+
+  private_dns_zone_group {
+    name = "${var.prefix}-acr-private-dns-zone-group"
+
+    private_dns_zone_ids = [
+      azurerm_private_dns_zone.kube_cluster_private_dns_zone.id
+    ]
+  }
+
+  depends_on = [
+    azurerm_virtual_network.kube_cluster_network,
+    azurerm_subnet.kube_cluster_subnet,
+    azurerm_container_registry.kube_cluster_acr
+  ]
+}
+
+# Create azure private dns zone virtual network link for acr private endpoint vnet
+resource "azurerm_private_dns_zone_virtual_network_link" "kube_cluster_acr_private_dns_zone_virtual_network_link" {
+  name                  = "${var.prefix}-private-dns-zone-vnet-link"
+  private_dns_zone_name = azurerm_private_dns_zone.kube_cluster_private_dns_zone.name
+  resource_group_name   = azurerm_resource_group.kube_cluster_rg.name
+  virtual_network_id    = azurerm_virtual_network.kube_cluster_network.id
+}
